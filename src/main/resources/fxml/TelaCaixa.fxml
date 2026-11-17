@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<VBox prefHeight="500.0" prefWidth="600.0" spacing="15.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.tomazbr9.controller.CaixaController">
+    <padding>
+        <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+    </padding>
+
+    <Label text="Caixa Rápido - Abastecimento" textFill="#2c3e50">
+        <font>
+            <Font name="System Bold" size="24.0" />
+        </font>
+    </Label>
+
+    <VBox>
+        <Button text="Gerenciar Produtos" onAction="#abrirGerenciamentoProdutos" />
+    </VBox>
+
+    <VBox spacing="5.0">
+        <Label text="1. Selecione o Combustível:" />
+        <ComboBox fx:id="cbProduto" prefWidth="300.0" />
+    </VBox>
+
+    <HBox spacing="20.0">
+        <VBox spacing="5.0">
+            <Label text="Quantidade (Litros):" />
+            <TextField fx:id="txtLitros" promptText="Ex: 40.0" />
+        </VBox>
+        <VBox spacing="5.0">
+            <Label text="Valor Total (R$):" />
+            <TextField fx:id="txtValor" promptText="Ex: 100.00" />
+        </VBox>
+    </HBox>
+
+    <Label text="Dados Adicionais (Opcional):" textFill="#7f8c8d">
+        <font>
+            <Font name="System Bold" size="14.0" />
+        </font>
+        <VBox.margin>
+            <Insets top="10.0" />
+        </VBox.margin>
+    </Label>
+
+    <HBox spacing="10.0">
+        <TextField fx:id="txtCpf" promptText="CPF / CNPJ" />
+        <TextField fx:id="txtPlaca" promptText="Placa (ABC-1234)" />
+        <TextField fx:id="txtKm" promptText="Odômetro (KM)" />
+    </HBox>
+
+    <VBox alignment="CENTER" spacing="10.0" style="-fx-background-color: #ecf0f1; -fx-padding: 20; -fx-background-radius: 5;">
+        <VBox.margin>
+            <Insets top="20.0" />
+        </VBox.margin>
+        <Label text="TOTAL A PAGAR">
+            <font>
+                <Font size="14.0" />
+            </font>
+        </Label>
+        <Label fx:id="lblTotalDestaque" text="R$ 0,00" textFill="#27ae60">
+            <font>
+                <Font name="System Bold" size="36.0" />
+            </font>
+        </Label>
+        <Button fx:id="btnFinalizar" mnemonicParsing="false" onAction="#finalizarVenda" prefHeight="40.0" prefWidth="250.0" style="-fx-background-color: #2980b9; -fx-text-fill: white; -fx-font-weight: bold;" text="FINALIZAR E IMPRIMIR (F12)" />
+    </VBox>
+</VBox>
