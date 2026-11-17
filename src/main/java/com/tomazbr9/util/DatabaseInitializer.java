@@ -35,6 +35,21 @@ public class DatabaseInitializer {
                 + "FOREIGN KEY (produto_id) REFERENCES produto(id)"
                 + ");";
 
+
+        String tabelaEstabelecimento = """
+                CREATE TABLE IF NOT EXISTS estabelecimento (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    nome TEXT NOT NULL,
+                    cnpj TEXT NOT NULL,
+                    endereco TEXT,
+                    cidade TEXT,
+                    uf TEXT,
+                    cep TEXT,
+                    telefone TEXT
+                );
+                """;
+
+
         // Criação de índices para ganho de performance em consultas
         String indexVendas = "CREATE INDEX IF NOT EXISTS idx_venda_data ON venda(data_hora);";
         String indexItens = "CREATE INDEX IF NOT EXISTS idx_item_venda_venda ON item_venda(venda_id);";
@@ -46,8 +61,11 @@ public class DatabaseInitializer {
             stmt.execute(tabelaProduto);
             stmt.execute(tabelaVenda);
             stmt.execute(tabelaItemVenda);
+            stmt.execute(tabelaEstabelecimento);
+
             stmt.execute(indexVendas);
             stmt.execute(indexItens);
+
 
             // Inserir dados de teste caso a tabela de produtos esteja vazia
             inserirProdutosIniciais(stmt);
