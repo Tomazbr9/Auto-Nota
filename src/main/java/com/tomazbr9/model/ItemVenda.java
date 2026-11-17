@@ -14,7 +14,8 @@ public class ItemVenda {
     private Long id;
     private Produto produto;
     private Long vendaId;
-    private Double litros;
+
+    private Double quantidade;
     private Double valorUnitario;
     private Double subtotal;
 }

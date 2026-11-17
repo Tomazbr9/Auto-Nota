@@ -4,78 +4,148 @@ import com.tomazbr9.model.ItemVenda;
 import com.tomazbr9.model.Venda;
 import com.tomazbr9.util.DatabaseConnection;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+import java.time.format.DateTimeFormatter;
 
 public class VendaDAO {
 
-    public void registrarVenda(Venda venda) throws SQLException {
-        String sqlVenda = "INSERT INTO venda (cpf_cnpj, placa, km, total_venda) VALUES (?, ?, ?, ?)";
-        String sqlItem = "INSERT INTO item_venda (venda_id, produto_id, litros, valor_unitario, subtotal) VALUES (?, ?, ?, ?, ?)";
+    public void registrarVenda(Venda venda)
+            throws SQLException {
 
-        Connection conn = null;
+        if (venda.getItens() == null
+                || venda.getItens().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "A venda deve possuir ao menos um item."
+            );
+        }
 
-        try {
-            conn = DatabaseConnection.getConnection();
-            // Desliga o salvamento automático para iniciar a Transação
+        String sqlVenda = """
+                INSERT INTO venda
+                (data_hora, cpf_cnpj, placa, km, total_venda)
+                VALUES (?, ?, ?, ?, ?)
+                """;
+
+        String sqlItem = """
+                INSERT INTO item_venda
+                (venda_id, produto_id, quantidade,
+                 valor_unitario, subtotal)
+                VALUES (?, ?, ?, ?, ?)
+                """;
+
+        try (Connection conn =
+                     DatabaseConnection.getConnection()) {
+
             conn.setAutoCommit(false);
 
-            // 1. Grava o Cabeçalho da Venda e pede o ID gerado de volta
-            long vendaId = 0;
-            try (PreparedStatement stmtVenda = conn.prepareStatement(sqlVenda, Statement.RETURN_GENERATED_KEYS)) {
-                stmtVenda.setString(1, venda.getCnpjCpf());
-                stmtVenda.setString(2, venda.getPlaca());
+            try {
+                long vendaId;
 
-                if (venda.getKm() != null) {
-                    stmtVenda.setInt(3, venda.getKm());
-                } else {
-                    stmtVenda.setNull(3, Types.INTEGER);
+                // 1. Registrar a venda
+
+                try (PreparedStatement stmt =
+                             conn.prepareStatement(sqlVenda)) {
+
+                    String dataHora = venda.getDataHora()
+                            .format(
+                                    DateTimeFormatter.ofPattern(
+                                            "yyyy-MM-dd HH:mm:ss"
+                                    )
+                            );
+
+                    stmt.setString(1, dataHora);
+                    stmt.setString(2, venda.getCnpjCpf());
+                    stmt.setString(3, venda.getPlaca());
+
+                    if (venda.getKm() != null) {
+                        stmt.setInt(4, venda.getKm());
+                    } else {
+                        stmt.setNull(
+                                4, java.sql.Types.INTEGER
+                        );
+                    }
+
+                    stmt.setDouble(5, venda.getTotal());
+
+                    stmt.executeUpdate();
                 }
 
-                stmtVenda.setDouble(4, venda.getTotal());
-                stmtVenda.executeUpdate();
+                // 2. Recuperar o ID no SQLite
 
-                // Recupera o ID gerado para esta venda
-                try (ResultSet rs = stmtVenda.getGeneratedKeys()) {
-                    if (rs.next()) {
-                        vendaId = rs.getInt(1);
-                        venda.setId(vendaId); // Atualiza o objeto Java com o ID do banco
-                    } else {
-                        throw new SQLException("Falha ao obter o ID da venda gerada.");
+                try (PreparedStatement stmt =
+                             conn.prepareStatement(
+                                     "SELECT last_insert_rowid()"
+                             );
+
+                     ResultSet rs = stmt.executeQuery()) {
+
+                    if (!rs.next()) {
+                        throw new SQLException(
+                                "Falha ao recuperar o ID da venda."
+                        );
+                    }
+
+                    vendaId = rs.getLong(1);
+
+                    if (vendaId <= 0) {
+                        throw new SQLException(
+                                "ID da venda invalido."
+                        );
                     }
                 }
-            }
 
-            // 2. Grava os Itens da Venda, amarrando ao ID da venda que acabamos de criar
-            try (PreparedStatement stmtItem = conn.prepareStatement(sqlItem)) {
-                for (ItemVenda item : venda.getItens()) {
-                    stmtItem.setDouble(1, vendaId);
-                    stmtItem.setDouble(2, item.getProduto().getId());
-                    stmtItem.setDouble(3, item.getLitros());
-                    stmtItem.setDouble(4, item.getValorUnitario());
-                    stmtItem.setDouble(5, item.getSubtotal());
+                // 3. Registrar todos os itens
 
-                    stmtItem.executeUpdate();
+                try (PreparedStatement stmt =
+                             conn.prepareStatement(sqlItem)) {
+
+                    for (ItemVenda item : venda.getItens()) {
+
+                        stmt.setLong(1, vendaId);
+                        stmt.setLong(
+                                2,
+                                item.getProduto().getId()
+                        );
+
+                        stmt.setDouble(
+                                3,
+                                item.getQuantidade()
+                        );
+
+                        stmt.setDouble(
+                                4,
+                                item.getValorUnitario()
+                        );
+
+                        stmt.setDouble(
+                                5,
+                                item.getSubtotal()
+                        );
+
+                        stmt.addBatch();
+                    }
+
+                    stmt.executeBatch();
                 }
-            }
 
-            // 3. Se chegou até aqui sem dar erro, confirma (salva) tudo de vez
-            conn.commit();
+                // 4. Confirmar a transacao
 
-        } catch (SQLException e) {
-            // Se deu qualquer erro no meio do caminho, desfaz tudo que tentou salvar
-            if (conn != null) {
+                conn.commit();
+
+                venda.setId(vendaId);
+
+            } catch (SQLException | RuntimeException e) {
+
                 try {
                     conn.rollback();
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
+                } catch (SQLException rollbackError) {
+                    e.addSuppressed(rollbackError);
                 }
-            }
-            throw e; // Repassa o erro para a tela avisar o operador
 
-        } finally {
-            // Restaura o comportamento padrão da conexão
-            if (conn != null) {
-                conn.setAutoCommit(true);
+                throw e;
             }
         }
     }

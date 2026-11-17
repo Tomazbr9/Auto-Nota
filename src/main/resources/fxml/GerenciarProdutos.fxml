@@ -1,27 +1,87 @@
 <?xml version="1.0" encoding="UTF-8"?>
+
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.geometry.*?>
 
-<VBox spacing="10" prefWidth="400" prefHeight="400" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.tomazbr9.controller.ProdutoController">
-    <padding><Insets top="20" right="20" bottom="20" left="20"/></padding>
+<VBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.tomazbr9.controller.ProdutoController"
+      spacing="12"
+      prefWidth="550"
+      prefHeight="520">
 
-    <Label text="Gerenciar Preços" style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
+    <padding>
+        <Insets top="20" right="20"
+                bottom="20" left="20"/>
+    </padding>
 
-    <TableView fx:id="tabelaProdutos" prefHeight="200" onMouseClicked="#selecionarProduto">
+    <Label text="Catálogo de Produtos"
+           style="-fx-font-size: 22px;
+                  -fx-font-weight: bold;"/>
+
+    <TableView fx:id="tabelaProdutos"
+               prefHeight="260"
+               VBox.vgrow="ALWAYS">
+
         <columns>
-            <TableColumn fx:id="colNome" text="Combustível" prefWidth="200"/>
-            <TableColumn fx:id="colPreco" text="Preço (R$)" prefWidth="100"/>
+            <TableColumn fx:id="colNome"
+                         text="Produto"
+                         prefWidth="300"/>
+
+            <TableColumn fx:id="colPreco"
+                         text="Preço (R$)"
+                         prefWidth="120"/>
+
+            <TableColumn fx:id="colUnidade"
+                         text="Unidade"
+                         prefWidth="80"/>
         </columns>
     </TableView>
 
-    <GridPane vgap="10" hgap="10">
-        <Label text="Nome:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
-        <TextField fx:id="txtNome" GridPane.rowIndex="0" GridPane.columnIndex="1" editable="false"/>
+    <GridPane hgap="10" vgap="12">
 
-        <Label text="Preço (R$):" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
-        <TextField fx:id="txtPreco" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+        <Label text="Nome:"
+               GridPane.rowIndex="0"
+               GridPane.columnIndex="0"/>
+
+        <TextField fx:id="txtNome"
+                   promptText="Ex: Óleo Castrol 5W30"
+                   prefWidth="350"
+                   GridPane.rowIndex="0"
+                   GridPane.columnIndex="1"/>
+
+        <Label text="Preço (R$):"
+               GridPane.rowIndex="1"
+               GridPane.columnIndex="0"/>
+
+        <TextField fx:id="txtPreco"
+                   promptText="Ex: 45,90"
+                   GridPane.rowIndex="1"
+                   GridPane.columnIndex="1"/>
+
+        <Label text="Unidade:"
+               GridPane.rowIndex="2"
+               GridPane.columnIndex="0"/>
+
+        <ComboBox fx:id="cbUnidade"
+                  prefWidth="150"
+                  GridPane.rowIndex="2"
+                  GridPane.columnIndex="1"/>
+
     </GridPane>
 
-    <Button text="Atualizar Preço" onAction="#atualizarPreco" style="-fx-background-color: #27ae60; -fx-text-fill: white;" maxWidth="Infinity"/>
+    <HBox spacing="10"
+          alignment="CENTER_RIGHT">
+
+        <Button text="Novo Produto"
+                onAction="#novoProduto"/>
+
+        <Button text="Salvar Produto"
+                onAction="#salvarProduto"
+                style="-fx-background-color: #27ae60;
+                       -fx-text-fill: white;"/>
+
+    </HBox>
+
 </VBox>

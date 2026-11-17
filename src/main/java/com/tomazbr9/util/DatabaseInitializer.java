@@ -1,6 +1,7 @@
 package com.tomazbr9.util;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -24,16 +25,25 @@ public class DatabaseInitializer {
                 + "total_venda REAL NOT NULL CHECK (total_venda >= 0)"
                 + ");";
 
-        String tabelaItemVenda = "CREATE TABLE IF NOT EXISTS item_venda ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                + "venda_id INTEGER NOT NULL, "
-                + "produto_id INTEGER NOT NULL, "
-                + "litros REAL NOT NULL CHECK (litros > 0), "
-                + "valor_unitario REAL NOT NULL CHECK (valor_unitario >= 0), "
-                + "subtotal REAL NOT NULL CHECK (subtotal >= 0), "
-                + "FOREIGN KEY (venda_id) REFERENCES venda(id) ON DELETE CASCADE, "
-                + "FOREIGN KEY (produto_id) REFERENCES produto(id)"
-                + ");";
+
+        String tabelaItemVenda = """
+        CREATE TABLE IF NOT EXISTS item_venda (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            venda_id INTEGER NOT NULL,
+            produto_id INTEGER NOT NULL,
+            quantidade REAL NOT NULL
+                CHECK (quantidade > 0),
+            valor_unitario REAL NOT NULL
+                CHECK (valor_unitario >= 0),
+            subtotal REAL NOT NULL
+                CHECK (subtotal >= 0),
+            FOREIGN KEY (venda_id)
+                REFERENCES venda(id) ON DELETE CASCADE,
+            FOREIGN KEY (produto_id)
+                REFERENCES produto(id)
+        );
+        """;
+
 
 
         String tabelaEstabelecimento = """
@@ -62,9 +72,11 @@ public class DatabaseInitializer {
             stmt.execute(tabelaVenda);
             stmt.execute(tabelaItemVenda);
             stmt.execute(tabelaEstabelecimento);
-
             stmt.execute(indexVendas);
             stmt.execute(indexItens);
+
+            adicionarUnidadeProdutoSeNecessario(stmt);
+            migrarQuantidadeItemVenda(stmt);
 
 
             // Inserir dados de teste caso a tabela de produtos esteja vazia
@@ -87,4 +99,89 @@ public class DatabaseInitializer {
             System.out.println("Combustíveis padrão inseridos na primeira execução.");
         }
     }
+
+
+    private static void adicionarUnidadeProdutoSeNecessario(
+            Statement stmt
+    ) throws SQLException {
+
+        boolean possuiUnidade = false;
+
+        try (ResultSet rs = stmt.executeQuery(
+                "PRAGMA table_info(produto)"
+        )) {
+            while (rs.next()) {
+                if ("unidade".equalsIgnoreCase(
+                        rs.getString("name")
+                )) {
+                    possuiUnidade = true;
+                    break;
+                }
+            }
+        }
+
+        if (!possuiUnidade) {
+
+            stmt.execute("""
+                ALTER TABLE produto
+                ADD COLUMN unidade TEXT NOT NULL
+                DEFAULT 'L'
+                CHECK (unidade IN ('L', 'UN'))
+                """);
+
+            System.out.println(
+                    "Coluna unidade adicionada à tabela produto."
+            );
+        }
+    }
+
+
+    private static void migrarQuantidadeItemVenda(
+            Statement stmt
+    ) throws SQLException {
+
+        boolean possuiLitros = false;
+        boolean possuiQuantidade = false;
+
+        try (var rs = stmt.executeQuery(
+                "PRAGMA table_info(item_venda)"
+        )) {
+
+            while (rs.next()) {
+
+                String coluna = rs.getString("name");
+
+                if ("litros".equalsIgnoreCase(coluna)) {
+                    possuiLitros = true;
+                }
+
+                if ("quantidade".equalsIgnoreCase(coluna)) {
+                    possuiQuantidade = true;
+                }
+            }
+        }
+
+        if (possuiQuantidade) {
+            return;
+        }
+
+        if (possuiLitros) {
+
+            stmt.execute("""
+                ALTER TABLE item_venda
+                RENAME COLUMN litros TO quantidade
+                """);
+
+            System.out.println(
+                    "Coluna litros migrada para quantidade."
+            );
+
+        } else {
+            throw new SQLException(
+                    "Tabela item_venda sem coluna de quantidade."
+            );
+        }
+    }
+
+
 }
