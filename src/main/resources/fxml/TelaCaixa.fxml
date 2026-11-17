@@ -20,9 +20,15 @@
         </font>
     </Label>
 
-    <VBox>
-        <Button text="Gerenciar Produtos" onAction="#abrirGerenciamentoProdutos" />
-    </VBox>
+    <HBox spacing="10">
+
+        <Button text="Gerenciar Produtos"
+                onAction="#abrirGerenciamentoProdutos"/>
+
+        <Button text="Configurações"
+                onAction="#abrirConfiguracoes"/>
+
+    </HBox>
 
     <VBox spacing="5.0">
         <Label text="1. Selecione o Combustível:" />

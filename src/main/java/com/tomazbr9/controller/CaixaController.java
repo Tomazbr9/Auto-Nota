@@ -202,4 +202,42 @@ public class CaixaController {
         alert.setContentText(mensagem);
         alert.showAndWait();
     }
+
+    @FXML
+    private void abrirConfiguracoes() {
+
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource(
+                            "/fxml/Estabelecimento.fxml"
+                    )
+            );
+
+            Parent root = loader.load();
+
+            Stage stage = new Stage();
+
+            stage.setTitle(
+                    "Configurações do Estabelecimento"
+            );
+
+            stage.setScene(new Scene(root));
+
+            stage.initModality(
+                    Modality.APPLICATION_MODAL
+            );
+
+            stage.setResizable(false);
+
+            stage.showAndWait();
+
+        } catch (IOException e) {
+            mostrarAlerta(
+                    "Erro",
+                    "Não foi possível abrir as configurações: "
+                            + e.getMessage(),
+                    Alert.AlertType.ERROR
+            );
+        }
+    }
 }
