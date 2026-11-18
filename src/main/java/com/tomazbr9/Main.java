@@ -6,6 +6,7 @@ import com.tomazbr9.licensing.LicenseService;
 import com.tomazbr9.licensing.LicenseValidationResult;
 
 import com.tomazbr9.util.DatabaseInitializer;
+import com.tomazbr9.util.DatabaseStorage;
 
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -19,6 +20,7 @@ import javafx.scene.control.Alert;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.sql.SQLException;
 
 public class Main extends Application {
 
@@ -28,31 +30,21 @@ public class Main extends Application {
     public void start(Stage primaryStage) {
 
         try {
-
-            // 1. Inicializa o servico de licencas.
-            // Se a chave publica estiver ausente,
-            // o aplicativo nao libera o caixa.
+            // 1. Inicializar licenciamento.
 
             licenseService =
                     LicenseService.criarPadrao();
 
-            // 2. Verifica se o aplicativo
-            // ja possui uma licenca valida.
+            // 2. Verificar licenca instalada.
 
             LicenseValidationResult resultado =
                     licenseService.verificarInstalada();
 
             if (resultado.valid()) {
 
-                // Licenca valida:
-                // abre normalmente o caixa.
-
                 abrirCaixa(primaryStage);
 
             } else {
-
-                // Licenca ausente ou invalida:
-                // mostra a tela de ativacao.
 
                 abrirAtivacao(
                         primaryStage,
@@ -74,16 +66,23 @@ public class Main extends Application {
     }
 
     // =====================================
-    // ABRIR TELA DO CAIXA
+    // ABRIR CAIXA
     // =====================================
 
     private void abrirCaixa(Stage stage)
-            throws IOException {
+            throws IOException, SQLException {
 
-        // O banco e a tela do caixa somente
-        // sao inicializados depois da ativacao.
+        // 1. Preparar pasta e migrar banco antigo.
+        // Isso ocorre antes de qualquer conexao
+        // com o novo banco.
+
+        DatabaseStorage.preparar();
+
+        // 2. Inicializar ou atualizar tabelas.
 
         DatabaseInitializer.inicializarBanco();
+
+        // 3. Carregar a interface.
 
         FXMLLoader loader = new FXMLLoader(
                 getClass().getResource(
@@ -104,7 +103,7 @@ public class Main extends Application {
     }
 
     // =====================================
-    // ABRIR TELA DE ATIVACAO
+    // ABRIR ATIVACAO
     // =====================================
 
     private void abrirAtivacao(
@@ -126,19 +125,15 @@ public class Main extends Application {
         controller.configurar(
                 licenseService,
 
-                // Executado apenas depois
-                // da ativacao bem-sucedida.
-
                 () -> {
-
                     try {
                         abrirCaixa(stage);
 
-                    } catch (IOException e) {
+                    } catch (Exception e) {
 
                         mostrarErroFatal(
-                                "Licenca instalada, mas nao "
-                                        + "foi possivel abrir o caixa:\n"
+                                "Licenca instalada, mas nao foi "
+                                        + "possivel abrir o caixa:\n"
                                         + e.getMessage()
                         );
                     }
@@ -147,9 +142,7 @@ public class Main extends Application {
                 motivo
         );
 
-        stage.setTitle(
-                "Auto-Nota - Ativacao"
-        );
+        stage.setTitle("Auto-Nota - Ativacao");
 
         stage.setScene(new Scene(root));
 
@@ -157,9 +150,7 @@ public class Main extends Application {
         stage.centerOnScreen();
     }
 
-    private void mostrarErroFatal(
-            String mensagem
-    ) {
+    private void mostrarErroFatal(String mensagem) {
 
         Alert alerta = new Alert(
                 Alert.AlertType.ERROR

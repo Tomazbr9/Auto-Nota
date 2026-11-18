@@ -1,20 +1,53 @@
 package com.tomazbr9.util;
 
+import java.io.IOException;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
-public class DatabaseConnection {
+public final class DatabaseConnection {
 
-    private static final String URL = "jdbc:sqlite:auto_nota.db";
+    private DatabaseConnection() {
+    }
 
-    public static Connection getConnection() throws SQLException {
+    public static Connection getConnection()
+            throws SQLException {
 
-        Connection connection = DriverManager.getConnection(URL);
+        Path banco = AppPaths.banco();
+
+        try {
+            Files.createDirectories(
+                    banco.getParent()
+            );
+
+        } catch (IOException e) {
+            throw new SQLException(
+                    "Sem acesso a pasta de dados: "
+                            + banco.getParent(),
+                    e
+            );
+        }
+
+        String url = "jdbc:sqlite:"
+                + banco.toAbsolutePath();
+
+        Connection connection =
+                DriverManager.getConnection(url);
 
         try (var stmt = connection.createStatement()) {
+
             stmt.execute("PRAGMA foreign_keys = ON");
+
+            // Aguarda brevemente em casos de
+            // bloqueio temporario do SQLite.
+            stmt.execute("PRAGMA busy_timeout = 5000");
+
         } catch (SQLException e) {
+
             connection.close();
             throw e;
         }

@@ -1,5 +1,7 @@
 package com.tomazbr9.licensing;
 
+import com.tomazbr9.util.AppPaths;
+
 import java.io.IOException;
 
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -9,7 +11,6 @@ import java.nio.file.StandardCopyOption;
 
 import java.security.GeneralSecurityException;
 
-import java.util.Locale;
 import java.util.Objects;
 
 public final class LicenseService {
@@ -28,6 +29,7 @@ public final class LicenseService {
             InstallationIdSource idSource,
             Path arquivoLicenca
     ) {
+
         this.validator = Objects.requireNonNull(
                 validator,
                 "Validador obrigatorio."
@@ -47,65 +49,84 @@ public final class LicenseService {
     public static LicenseService criarPadrao()
             throws IOException, GeneralSecurityException {
 
-        return new LicenseService(
+        LicenseService servico = new LicenseService(
                 LicenseValidator.criarPadrao(),
                 InstallationIdProvider::obter,
                 caminhoPadrao()
         );
+
+        servico.migrarLicencaAnteriorSeNecessario();
+
+        return servico;
     }
 
     public static Path caminhoPadrao() {
-
-        String sistema = System.getProperty(
-                "os.name", ""
-        ).toLowerCase(Locale.ROOT);
-
-        Path home = Path.of(
-                System.getProperty("user.home")
-        );
-
-        Path pasta;
-
-        if (sistema.contains("win")) {
-
-            String localAppData =
-                    System.getenv("LOCALAPPDATA");
-
-            pasta = localAppData != null
-                    && !localAppData.isBlank()
-                    ? Path.of(localAppData)
-                    : home.resolve("AppData")
-                    .resolve("Local");
-
-            pasta = pasta.resolve("AutoNota");
-
-        } else {
-
-            String xdgDataHome =
-                    System.getenv("XDG_DATA_HOME");
-
-            if (xdgDataHome != null
-                    && !xdgDataHome.isBlank()
-                    && Path.of(xdgDataHome).isAbsolute()) {
-
-                pasta = Path.of(xdgDataHome);
-
-            } else {
-
-                pasta = home.resolve(".local")
-                        .resolve("share");
-            }
-
-            pasta = pasta.resolve("auto-nota");
-        }
-
-        return pasta.resolve("license.lic")
-                .toAbsolutePath()
-                .normalize();
+        return AppPaths.licenca();
     }
 
     public Path obterCaminhoLicenca() {
         return arquivoLicenca;
+    }
+
+    // =====================================
+    // MIGRACAO DA LICENCA ANTERIOR
+    // =====================================
+
+    private void migrarLicencaAnteriorSeNecessario() {
+
+        if (!AppPaths.isWindows()
+                || Files.exists(arquivoLicenca)) {
+            return;
+        }
+
+        String localAppData =
+                System.getenv("LOCALAPPDATA");
+
+        if (localAppData == null
+                || localAppData.isBlank()) {
+            return;
+        }
+
+        Path licencaAnterior = Path.of(
+                localAppData,
+                "AutoNota",
+                "license.lic"
+        );
+
+        if (!Files.isRegularFile(licencaAnterior)) {
+            return;
+        }
+
+        try {
+            LicenseValidationResult resultado =
+                    ativar(licencaAnterior);
+
+            if (resultado.valid()) {
+
+                System.out.println(
+                        "Licenca anterior migrada para: "
+                                + arquivoLicenca
+                );
+
+            } else {
+
+                System.err.println(
+                        "Licenca anterior nao foi migrada: "
+                                + resultado.message()
+                );
+            }
+
+        } catch (IOException | SecurityException e) {
+
+            // Nao impede a abertura da tela
+            // de ativacao. O usuario ainda pode
+            // importar sua licenca manualmente.
+
+            System.err.println(
+                    "Nao foi possivel migrar a licenca: "
+                            + e.getMessage()
+            );
+        }
     }
 
     // =====================================
@@ -125,7 +146,7 @@ public final class LicenseService {
     }
 
     // =====================================
-    // VALIDAR ASSINATURA E COMPUTADOR
+    // VALIDAR ARQUIVO E COMPUTADOR
     // =====================================
 
     public LicenseValidationResult validarArquivo(
@@ -140,7 +161,6 @@ public final class LicenseService {
         }
 
         try {
-
             String idAtual = idSource.obter();
 
             if (idAtual == null || idAtual.isBlank()) {
@@ -176,7 +196,7 @@ public final class LicenseService {
     }
 
     // =====================================
-    // IMPORTAR E ATIVAR UMA LICENCA
+    // IMPORTAR E ATIVAR LICENCA
     // =====================================
 
     public LicenseValidationResult ativar(
@@ -190,8 +210,7 @@ public final class LicenseService {
             );
         }
 
-        // Antes de copiar, verifica se a
-        // licenca realmente autoriza a maquina.
+        // Confere antes de instalar.
 
         LicenseValidationResult resultado =
                 validarArquivo(origem);
@@ -211,19 +230,11 @@ public final class LicenseService {
         );
 
         try {
-
-            // Copia a licenca para um arquivo
-            // temporario dentro da pasta final.
-
             Files.copy(
                     origem,
                     temporario,
                     StandardCopyOption.REPLACE_EXISTING
             );
-
-            // Confere novamente os bytes copiados.
-            // Uma licenca invalida nao substituira
-            // a licenca que ja estiver instalada.
 
             LicenseValidationResult copiaValidada =
                     validarArquivo(temporario);
@@ -232,11 +243,7 @@ public final class LicenseService {
                 return copiaValidada;
             }
 
-            // Substituicao atomica, quando
-            // suportada pelo sistema de arquivos.
-
             try {
-
                 Files.move(
                         temporario,
                         arquivoLicenca,
@@ -253,11 +260,9 @@ public final class LicenseService {
                 );
             }
 
-            // Confirma o resultado apos instalar.
             return verificarInstalada();
 
         } finally {
-
             Files.deleteIfExists(temporario);
         }
     }

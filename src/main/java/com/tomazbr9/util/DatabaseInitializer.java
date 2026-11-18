@@ -5,46 +5,55 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-public class DatabaseInitializer {
+public final class DatabaseInitializer {
 
-    public static void inicializarBanco() {
+    private DatabaseInitializer() {
+    }
 
-        String tabelaProduto = "CREATE TABLE IF NOT EXISTS produto ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                + "nome TEXT NOT NULL, "
-                + "preco REAL NOT NULL"
-                + ");";
+    public static void inicializarBanco()
+            throws SQLException {
 
-        String tabelaVenda = "CREATE TABLE IF NOT EXISTS venda ("
-                + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                + "data_hora TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')), "
-                + "cpf_cnpj TEXT, "
-                + "placa TEXT, "
-                + "km INTEGER, "
-                + "bico INTEGER,"
-                + "total_venda REAL NOT NULL CHECK (total_venda >= 0)"
-                + ");";
+        String tabelaProduto = """
+                CREATE TABLE IF NOT EXISTS produto (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nome TEXT NOT NULL,
+                    preco REAL NOT NULL
+                );
+                """;
 
+        String tabelaVenda = """
+                CREATE TABLE IF NOT EXISTS venda (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    data_hora TEXT NOT NULL DEFAULT (
+                        strftime('%Y-%m-%d %H:%M:%S',
+                                 'now', 'localtime')
+                    ),
+                    cpf_cnpj TEXT,
+                    placa TEXT,
+                    km INTEGER,
+                    bico INTEGER,
+                    total_venda REAL NOT NULL
+                        CHECK (total_venda >= 0)
+                );
+                """;
 
         String tabelaItemVenda = """
-        CREATE TABLE IF NOT EXISTS item_venda (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            venda_id INTEGER NOT NULL,
-            produto_id INTEGER NOT NULL,
-            quantidade REAL NOT NULL
-                CHECK (quantidade > 0),
-            valor_unitario REAL NOT NULL
-                CHECK (valor_unitario >= 0),
-            subtotal REAL NOT NULL
-                CHECK (subtotal >= 0),
-            FOREIGN KEY (venda_id)
-                REFERENCES venda(id) ON DELETE CASCADE,
-            FOREIGN KEY (produto_id)
-                REFERENCES produto(id)
-        );
-        """;
-
-
+                CREATE TABLE IF NOT EXISTS item_venda (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    venda_id INTEGER NOT NULL,
+                    produto_id INTEGER NOT NULL,
+                    quantidade REAL NOT NULL
+                        CHECK (quantidade > 0),
+                    valor_unitario REAL NOT NULL
+                        CHECK (valor_unitario >= 0),
+                    subtotal REAL NOT NULL
+                        CHECK (subtotal >= 0),
+                    FOREIGN KEY (venda_id)
+                        REFERENCES venda(id) ON DELETE CASCADE,
+                    FOREIGN KEY (produto_id)
+                        REFERENCES produto(id)
+                );
+                """;
 
         String tabelaEstabelecimento = """
                 CREATE TABLE IF NOT EXISTS estabelecimento (
@@ -59,47 +68,74 @@ public class DatabaseInitializer {
                 );
                 """;
 
+        try (Connection conn =
+                     DatabaseConnection.getConnection();
 
-        // Criação de índices para ganho de performance em consultas
-        String indexVendas = "CREATE INDEX IF NOT EXISTS idx_venda_data ON venda(data_hora);";
-        String indexItens = "CREATE INDEX IF NOT EXISTS idx_item_venda_venda ON item_venda(venda_id);";
-
-        try (Connection conn = DatabaseConnection.getConnection();
              Statement stmt = conn.createStatement()) {
 
-            // Executa a criação de cada tabela e índice
             stmt.execute(tabelaProduto);
             stmt.execute(tabelaVenda);
             stmt.execute(tabelaItemVenda);
             stmt.execute(tabelaEstabelecimento);
-            stmt.execute(indexVendas);
-            stmt.execute(indexItens);
 
+            // Migracoes existentes.
             adicionarUnidadeProdutoSeNecessario(stmt);
             migrarQuantidadeItemVenda(stmt);
 
+            stmt.execute("""
+                    CREATE INDEX IF NOT EXISTS
+                    idx_venda_data
+                    ON venda(data_hora)
+                    """);
 
-            // Inserir dados de teste caso a tabela de produtos esteja vazia
+            stmt.execute("""
+                    CREATE INDEX IF NOT EXISTS
+                    idx_item_venda_venda
+                    ON item_venda(venda_id)
+                    """);
+
+            // Preserva o comportamento atual:
+            // produtos de exemplo apenas se
+            // o catalogo estiver vazio.
             inserirProdutosIniciais(stmt);
 
-            System.out.println("Banco de dados SQLite inicializado com sucesso.");
-
-        } catch (SQLException e) {
-            System.err.println("Erro ao inicializar o banco de dados: " + e.getMessage());
+            System.out.println(
+                    "Banco SQLite inicializado: "
+                            + AppPaths.banco()
+            );
         }
     }
 
-    private static void inserirProdutosIniciais(Statement stmt) throws SQLException {
-        // Verifica se já existem produtos cadastrados
-        var rs = stmt.executeQuery("SELECT COUNT(*) FROM produto;");
-        if (rs.next() && rs.getInt(1) == 0) {
-            stmt.execute("INSERT INTO produto (nome, preco) VALUES ('Gasolina Comum', 5.89);");
-            stmt.execute("INSERT INTO produto (nome, preco) VALUES ('Gasolina Aditivada', 6.09);");
-            stmt.execute("INSERT INTO produto (nome, preco) VALUES ('Etanol', 3.99);");
-            System.out.println("Combustíveis padrão inseridos na primeira execução.");
+    private static void inserirProdutosIniciais(
+            Statement stmt
+    ) throws SQLException {
+
+        boolean vazio;
+
+        try (ResultSet rs = stmt.executeQuery(
+                "SELECT COUNT(*) FROM produto"
+        )) {
+            vazio = rs.next() && rs.getInt(1) == 0;
+        }
+
+        if (vazio) {
+
+            stmt.execute("""
+                    INSERT INTO produto (nome, preco)
+                    VALUES ('Gasolina Comum', 5.89)
+                    """);
+
+            stmt.execute("""
+                    INSERT INTO produto (nome, preco)
+                    VALUES ('Gasolina Aditivada', 6.09)
+                    """);
+
+            stmt.execute("""
+                    INSERT INTO produto (nome, preco)
+                    VALUES ('Etanol', 3.99)
+                    """);
         }
     }
-
 
     private static void adicionarUnidadeProdutoSeNecessario(
             Statement stmt
@@ -110,7 +146,9 @@ public class DatabaseInitializer {
         try (ResultSet rs = stmt.executeQuery(
                 "PRAGMA table_info(produto)"
         )) {
+
             while (rs.next()) {
+
                 if ("unidade".equalsIgnoreCase(
                         rs.getString("name")
                 )) {
@@ -123,18 +161,13 @@ public class DatabaseInitializer {
         if (!possuiUnidade) {
 
             stmt.execute("""
-                ALTER TABLE produto
-                ADD COLUMN unidade TEXT NOT NULL
-                DEFAULT 'L'
-                CHECK (unidade IN ('L', 'UN'))
-                """);
-
-            System.out.println(
-                    "Coluna unidade adicionada à tabela produto."
-            );
+                    ALTER TABLE produto
+                    ADD COLUMN unidade TEXT NOT NULL
+                    DEFAULT 'L'
+                    CHECK (unidade IN ('L', 'UN'))
+                    """);
         }
     }
-
 
     private static void migrarQuantidadeItemVenda(
             Statement stmt
@@ -143,7 +176,7 @@ public class DatabaseInitializer {
         boolean possuiLitros = false;
         boolean possuiQuantidade = false;
 
-        try (var rs = stmt.executeQuery(
+        try (ResultSet rs = stmt.executeQuery(
                 "PRAGMA table_info(item_venda)"
         )) {
 
@@ -168,20 +201,15 @@ public class DatabaseInitializer {
         if (possuiLitros) {
 
             stmt.execute("""
-                ALTER TABLE item_venda
-                RENAME COLUMN litros TO quantidade
-                """);
-
-            System.out.println(
-                    "Coluna litros migrada para quantidade."
-            );
+                    ALTER TABLE item_venda
+                    RENAME COLUMN litros TO quantidade
+                    """);
 
         } else {
+
             throw new SQLException(
-                    "Tabela item_venda sem coluna de quantidade."
+                    "Tabela item_venda sem coluna quantidade."
             );
         }
     }
-
-
 }
