@@ -36,6 +36,9 @@
         <Button text="Configurações"
                 onAction="#abrirConfiguracoes"/>
 
+        <Button text="Identificação da Máquina"
+                onAction="#mostrarIdentificacaoComputador"/>
+
     </HBox>
 
     <Separator/>

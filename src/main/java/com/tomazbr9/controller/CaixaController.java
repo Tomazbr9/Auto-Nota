@@ -3,7 +3,8 @@ package com.tomazbr9.controller;
 
 import com.tomazbr9.dao.ProdutoDAO;
 import com.tomazbr9.dao.VendaDAO;
-
+import com.tomazbr9.licensing.InstallationIdException;
+import com.tomazbr9.licensing.InstallationIdProvider;
 import com.tomazbr9.model.ItemVenda;
 import com.tomazbr9.model.Produto;
 import com.tomazbr9.model.Venda;
@@ -21,7 +22,9 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 
 import javafx.scene.control.*;
-
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -707,4 +710,88 @@ public class CaixaController {
 
         alerta.showAndWait();
     }
+
+
+    @FXML
+    private void mostrarIdentificacaoComputador() {
+
+        try {
+            String identificacao =
+                    InstallationIdProvider.obter();
+
+            TextField campoCodigo =
+                    new TextField(identificacao);
+
+            campoCodigo.setEditable(false);
+            campoCodigo.setPrefColumnCount(42);
+
+            Label orientacao = new Label(
+                    "Copie este codigo e envie ao fornecedor "
+                            + "para solicitar sua licenca."
+            );
+
+            orientacao.setWrapText(true);
+
+            VBox conteudo = new VBox(
+                    10,
+                    orientacao,
+                    campoCodigo
+            );
+
+            ButtonType botaoCopiar = new ButtonType(
+                    "Copiar codigo",
+                    ButtonBar.ButtonData.OTHER
+            );
+
+            Alert dialogo = new Alert(
+                    Alert.AlertType.INFORMATION
+            );
+
+            dialogo.setTitle(
+                    "Licenciamento do Auto-Nota"
+            );
+
+            dialogo.setHeaderText(
+                    "Identificacao deste computador"
+            );
+
+            dialogo.getDialogPane().setContent(
+                    conteudo
+            );
+
+            dialogo.getButtonTypes().setAll(
+                    botaoCopiar,
+                    ButtonType.CLOSE
+            );
+
+            dialogo.showAndWait().ifPresent(
+                    resposta -> {
+
+                        if (resposta == botaoCopiar) {
+
+                            ClipboardContent clipboard =
+                                    new ClipboardContent();
+
+                            clipboard.putString(
+                                    identificacao
+                            );
+
+                            Clipboard.getSystemClipboard()
+                                    .setContent(clipboard);
+                        }
+                    }
+            );
+
+        } catch (InstallationIdException e) {
+
+            mostrarAlerta(
+                    "Erro",
+                    "Nao foi possivel identificar "
+                            + "este computador: "
+                            + e.getMessage(),
+                    Alert.AlertType.ERROR
+            );
+        }
+    }
+
 }
