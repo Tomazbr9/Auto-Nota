@@ -115,7 +115,7 @@ try {
         "--main-jar", $nomeJar,
         "--main-class", "com.tomazbr9.Launcher",
         "--add-modules",
-        "java.desktop,java.sql,jdk.crypto.ec,jdk.charsets,jdk.localedata"
+        "java.desktop,java.sql,java.scripting,jdk.crypto.ec,jdk.charsets,jdk.localedata"
     )
 
     # Icone opcional
