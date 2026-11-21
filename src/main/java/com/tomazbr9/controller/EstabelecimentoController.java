@@ -3,12 +3,13 @@ package com.tomazbr9.controller;
 
 import com.tomazbr9.dao.EstabelecimentoDAO;
 import com.tomazbr9.model.Estabelecimento;
-
+import com.tomazbr9.util.CnpjFormatter;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.Alert;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextFormatter;
 import javafx.stage.Stage;
 
 import java.sql.SQLException;
@@ -28,8 +29,46 @@ public class EstabelecimentoController {
 
     private Estabelecimento estabelecimento;
 
+
     @FXML
     public void initialize() {
+
+        txtCnpj.setTextFormatter(
+                new TextFormatter<String>(change -> {
+
+                    String novoTexto = change.getControlNewText();
+
+                    // Aceita digitos e pontuacao do CNPJ.
+                    if (!novoTexto.matches("[0-9./\\-\\s]*")) {
+                        return null;
+                    }
+
+                    String numeros =
+                            CnpjFormatter.somenteNumeros(novoTexto);
+
+                    // Limite de 14 digitos.
+                    if (numeros.length() > 14) {
+                        return null;
+                    }
+
+                    String formatado =
+                            CnpjFormatter.formatarParcial(numeros);
+
+                    // Substitui o texto pela versao formatada.
+                    change.setRange(
+                            0,
+                            change.getControlText().length()
+                    );
+
+                    change.setText(formatado);
+
+                    change.setCaretPosition(formatado.length());
+                    change.setAnchor(formatado.length());
+
+                    return change;
+                })
+        );
+
         carregarDados();
     }
 
@@ -39,7 +78,7 @@ public class EstabelecimentoController {
                 estabelecimento = dados;
 
                 txtNome.setText(dados.getNome());
-                txtCnpj.setText(dados.getCnpj());
+                txtCnpj.setText(CnpjFormatter.formatar(dados.getCnpj()));
                 txtEndereco.setText(dados.getEndereco());
                 txtCidade.setText(dados.getCidade());
                 txtUf.setText(dados.getUf());
@@ -61,8 +100,9 @@ public class EstabelecimentoController {
     private void salvar() {
 
         String nome = txtNome.getText().trim();
-        String cnpj = txtCnpj.getText()
-                .replaceAll("\\D", "");
+        String cnpj = CnpjFormatter.somenteNumeros(
+                txtCnpj.getText()
+        );
 
         if (nome.isBlank() || cnpj.isBlank()) {
             mostrarAlerta(
